@@ -1,0 +1,554 @@
+---
+title: ""
+author: "Armando Jerónimo"
+date: "2025-03-24"
+output: html_document
+---
+<html lang="es"> 
+<head> 
+<meta charset="UTF-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Índice de Secciones</title> 
+  <style> 
+    .enlace-grande { 
+      font-size: 20px; /* Ajusta el tamaño según tus necesidades*/
+      font-family: Arial, sans-serif; /* Cambia el tipo de letra según tus necesidades */ 
+      color: #f22b56; /* Cambia el color del texto si lo deseas */ 
+      text-decoration: none; /* Elimina el subrayado del enlace */
+      } 
+      .full-width-image {
+      width: 100%;
+      height: auto; /* Mantiene las proporciones originales */
+      object-fit: cover; /* Asegura que la imagen se ajuste bien dentro del contenedor */
+      }
+
+     .container { 
+     display: flex; 
+     align-items: center; 
+     } 
+     .image { margin-right: 20px; 
+     }
+     .descriptions { 
+     list-style-type: disc;
+     }
+     .full-width-image { 
+     width: 100%; 
+     height: auto; 
+     max-height: 50vh; /* Ajusta la altura máxima al 50% de la altura de la ventana */ 
+     }
+     .recuadros-container { 
+     display: flex;
+     flex-wrap: wrap;
+     justify-content: space-around; 
+     } 
+     .box { 
+     width: 45%; 
+     border: 1px solid #000;
+     padding: 10px;
+     margin: 10px; 
+     box-sizing: border-box;
+     } 
+     .enlace-grande2 { 
+     text-decoration: none; 
+     color: #000;
+     }
+      .custom-link {
+        color: #b9c3c4; /* Color del texto del enlace */
+        text-decoration: none; /* Sin subrayado */
+        font-size: 18px; /* Tamaño de la fuente */
+        font-weight: bold; /* Negrita */
+        border: 2px solid #fcbd54; /* Borde */
+        border-radius: 5px; /* Bordes redondeados */
+        padding: 10px; /* Espaciado interno */
+        display: inline-block; /* Mostrar como bloque en línea */
+        transition: background-color 0.3s, color 0.3s; /* Efecto de transición */
+    }
+    .custom-link:hover {
+        background-color: #ffc018; /* Color de fondo al pasar el ratón */
+        color: #ff9934; /* Color del texto al pasar el ratón */
+    }
+    </style>
+  </head> 
+<body>
+# **Dimensión de Bienestar Económico y Capital Humano** 
+
+## **Análisis diagnóstico a partir del perfil socioeconómico de las jefas y jefes del hogar.**<br>
+Con el propósito de conocer las características en materia de ingresos laborales y educación de la población identificada como jefes de familia, aquellos que aportan el ingreso principal al hogar, se tomó una muestra del total de la población en los CHECS. Para este análisis se consideró lo siguiente:<br>
+<ul>
+  <li>Del Cuestionario Homologado del Estado de Condiciones Socioeconómicas (CHECS) con 97,822 cuestionarios de hogar, se seleccionó a la primera persona registrada en cada encuesta (jefe de familia).<br> 
+  <li>Se procedió a agrupar los datos por identificador de vivienda, identificador de integrante y CURP para eliminar posibles duplicados por hogar.<br>
+  <li>Se extrajeron los datos socioeconómicos de la persona.<br>
+  <li>Se tomaron solo aquellos casos con ingreso positivo.<br>
+  <li>De acuerdo con la encuessta se consideraron sólo ingresos de hasta 98,000 pesos y los casos con ingresos no reportados  o con el valor de 99,999 se eliminaron.<br><br>
+</ul>
+Debido a que la pregunta sobre los ingresos mensuales es diferente entre la encuesta del año 2022 y la encuesta levantada a partir de 2023 se extrajo el año de levantamiento. En el caso de levantamiento del año de 2022 el calculó se hace con el monto y la periodicidad mensual; mientras que, para los levantamientos a partir del año 2023 corresponde al monto promedio mensual.<br>
+Esto acotó el universo de análisis a un subconjunto de 16,492 casos, 10,209 correspondientes al año de 2022 y 6,283 correspondientes al año de 2023 y posteriores.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+library(plotly)
+library(sf)
+library(dplyr)
+library(sqldf)
+library(tidyverse)
+library(gridExtra)
+library(knitr)
+library(plotly)
+#install.packages("scales")
+library(scales)
+library(kableExtra)
+
+
+setwd("C:/Presentacion")
+
+df_ingresos <- read.csv("Jefes_chec_ingresos_2410.csv")  #Jefes_chec_ingresos_2410
+df_2022 <- subset(df_ingresos,año_levantamiento==2022)
+
+
+df_2022 <- sqldf("select * from df_2022
+                 where año_levantamiento = 2022 and monto_float IS NOT null and monto_float
+                 between 1 and 98000
+                ")
+
+df_2022 <- df_2022 %>%
+  mutate(ingresos_mensuales = case_when(
+    np57frecuenciaingreso == 1  ~ monto_float*30,
+    np57frecuenciaingreso == 2  ~ monto_float*4,
+    np57frecuenciaingreso == 3  ~ monto_float*2,
+    np57frecuenciaingreso == 4  ~ monto_float,
+    TRUE ~ NA_real_
+  ))
+df_2022 <- sqldf("select * from df_2022 where ingresos_mensuales <98000") # podemos dejar parejo 98,000 en 2022 y 2023
+
+#sqldf("select * from df_2022 where monto_float >50000")
+
+df_2023 <- subset(df_ingresos,año_levantamiento==2023)
+df_2023 <- sqldf("select * from df_2023
+                 where monto_float IS NOT null and 
+                 monto_float between 1 and 98000
+                ")
+df_2023 <- df_2023 %>% mutate(ingresos_mensuales = monto_float)
+
+# Combinamos ambas tablas
+todas <- rbind(df_2022,df_2023)
+```
+<hr style="border: 6px solid  #ff6d1f;"/>
+## Análisis descriptivo de la población con la información de los CHECS
+De esta población se identica que el 53.4% son mujeres y 46.6% son hombres. Agrupando la población por intevalos de 5 años a partir de la persona de menor edad reportada se identifica lo siguiente: <br><br> 
+En el caso de las mujeres la mayor proporción de los casos se da entre quienes tienen de 28 a 33 años, lo que equivale al 16.74% de las mujeres;<br>
+mientras que, en el caso de los hombres la mayor cantidad de casos se da entre quienes tienen entre los 33 y 38 años de edad, lo que equivale al 14.86%.<br>
+La edad promedio de toda la muestra es de 41 años de edad.
+```{r edad_sex, echo=FALSE, message=FALSE, warning=FALSE,fig.width=10, fig.height=6}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+# Calcular el conteo de hombres y mujeres por rango de edad
+todas_2 <- todas %>%
+  mutate(rango_edad = cut(edad, breaks = seq(min(edad), max(edad), by = 5), include.lowest = TRUE)) %>% # Crear rangos de edad
+  group_by(rango_edad, desc_sexo) %>%
+  summarise(conteo = n()) %>%
+  ungroup()
+
+# Crear el gráfico con el conteo por rango de edad
+g_edad <- ggplot(todas_2, aes(x = rango_edad, y = conteo, 
+                              fill = desc_sexo, text = paste("<br>Rango de Edad:",
+                              rango_edad,                                                                                       "<br>Sexo:", desc_sexo,                                                                                       "<br>Conteo:", conteo))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distribución por Rango de Edad y Sexo",
+       x = "Rango de Edad",
+       y = "Número de Jefas y Jefes de hogar") +
+  theme_minimal()
+
+# Convertir a gráfico interactivo con ggplotly
+ggplotly(g_edad, tooltip = "text")
+
+
+```
+<hr style="border: 6px solid  #ff6d1f;"/>
+<h3>Nivel de ingresos y edad laboral</h3>
+En la gráfica se observa que en esta población partir de los 25 años el ingreso laboral alcanza el monto máximo y es a partir de ese momento que los ingresos de las personas se estabilizan a lo largo de su vida laboral; en algunos casos, entre los 32 y los 42 años el ingreso laboral tiene un repunte; no obstante, de manera generalizada el ingreso laboral se mantiene estable al mismo nivel que se tenía a partir de los 25 años de edad.<br><br>
+En la gráfica también se observa que despúes de los 60 años el ingreso laboral comienza a reducirse, lo que en parte se explica debido a que las personas abandonan su vida laboral y/o comienzan a realizar actividades no formales, recordemos que en este punto no se consideran los ingresos por transferencias o donaciones, únicamente se tomaron para ello los ingresos laborales.
+
+```{r edad_ingresos, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = todas) + geom_point(aes(x=edad, y=ingresos_mensuales))+
+theme_minimal() +
+  labs(title = "Personas en CHECS con Ingresos personales y edad reportada",
+       x = "Edad",
+       y = "Ingresos mensuales",
+       fill = "Densidad")
+
+
+```
+<hr style="border: 6px solid  #ff6d1f;"/>
+Mientras que la edad promedio de las personas en la muestra es 41 años, el ingreso promedio mensual asciende a los $4,342 mensuales, lo que equivale a 144.73 pesos diarios en promedio para las jefas y jefes del hogar, monto menor al del salario mínimo vigente en el año de 2022 (172.87 pesos diarios). <br><br>
+```{r ingresos, echo=FALSE, message=FALSE, warning=FALSE}
+(g1 <- ggplot(todas, aes(x=ingresos_mensuales)) +
+    geom_histogram(aes(fill=..count..), bins=20, color="white") +
+  geom_vline(aes(xintercept=mean(ingresos_mensuales)), color="red") +
+  geom_vline(aes(xintercept=median(ingresos_mensuales)), color= "darkgreen")+
+    labs(title = "Ingresos declarados en CHECS ", x="Ingreso Mensual", y="Jefes de Familia")
+)
+```
+
+<br>
+<h3>Promedio de edad e ingreso laboral</h3>
+```{r resumen, echo=FALSE, message=FALSE, warning=FALSE}
+res1 <- round(sqldf("select count(*) Personas,avg(edad) Edad, avg(ingresos_mensuales) Ingreso
+             from todas"),0)
+res1 <- res1 %>%
+  mutate(
+    Personas = comma(Personas), # Separador de miles para la columna Personas
+    Edad = round(Edad, 1), # Redondear Edad
+    Ingreso = comma(round(Ingreso, 0)) # Separador de miles para la columna Ingreso
+  )
+res1 %>%
+    kable(format = "html", digits = 3, align = c("r", "c", "c")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+<br>
+<hr style="border: 6px solid  #ff6d1f;"/>
+<h3>Ingresos diferenciados por sexo</h3>
+Al analizar el ingreso personal diferenciándolo por sexo mediante la gráfica de cajas, la cual agrupa la población en cuartiles, se observa que existe diferencia entre los ingresos reportados para los hombres respecto de las mujeres; mientras que, la mediana de la población en general es de $4,000 mensuales; en el caso de los hombres, esta es de $4,800 mensuales y el de las mujeres es de $3,000 mensuales. En el caso de la media del ingreso de los hombres, ésta es de $5,160.01; mientras que, la media de las mujeres es de $3,628.44.<br><br>
+Nota: El uso de la mediana es una medida más adecuado cuando existen valores atípicos alejados del resto de los datos, como en este caso, ya que la media es más sensible a estos valores.
+```{r ingresos_x_sexo, echo=FALSE, message=FALSE, warning=FALSE}
+
+
+fig <- plot_ly(todas, x = ~desc_sexo, y = ~ingresos_mensuales, color = ~desc_sexo, type = "box") %>%
+  layout(title = "Gráfica de Ingresos mensuales y sexo",
+         xaxis = list(title = "Sexo", tickangle = -2),
+         yaxis = list(title = "Ingresos Mensuales"),
+         boxmode = "group")
+
+# Mostrar el gráfico
+fig
+
+```
+<h3>Comparación de medias entre los ingresos de los hombres y las mujeres.</h3> 
+Considerando que el número casos de hombres (7,680) respecto de las mujeres (8,812) es diferente en la muestra, para comprobar si existe una diferencia significativa entre la media de los ingresos de ambas poblaciones, se procede a probar si: las medias de las ingresos de los hombres y las mujeres son iguales en las muestras independientes de hombres y mujeres; contra: existe una diferencia significativa entre la media de los ingresos de los hombres y las mujeres.<br>
+```{r medias_ingresos_sexo, echo=FALSE, message=FALSE, warning=FALSE}
+ingresos_hombres <- todas %>% filter(desc_sexo=="HOMBRE") %>% select(ingresos_mensuales)
+ingresos_mujeres <- todas %>% filter(desc_sexo=="MUJER") %>% select(ingresos_mensuales)
+
+resultado_t <- t.test(ingresos_hombres, ingresos_mujeres, alternative = "two.sided")
+
+# Mostrar los resultados
+# print(resultado_t)
+
+library(knitr)
+
+# Crear una tabla con los resultados clave de resultado_t
+tabla_resultado <- data.frame(
+  Estadístico = c("Estimado de la diferencia de medias: $", "t-valor", "gl", "p-valor", "Intervalo de Confianza Inferior: $", "Intervalo de Confianza Superior: $","Ingreso medio hombres: $","Ingreso medio mujeres: $"),
+  Valor = c(
+    resultado_t$estimate[1] - resultado_t$estimate[2],
+    resultado_t$statistic,
+    resultado_t$parameter,
+    resultado_t$p.value,
+    resultado_t$conf.int[1],
+    resultado_t$conf.int[2],
+    resultado_t$estimate[1],
+    resultado_t$estimate[2]
+  )
+)
+
+# Exportar como tabla HTML
+kable(tabla_resultado, format = "html", align = c("l", "l"),col.names = c("Estadístico", "Valor")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+<br>
+Dado que p-valor < 0.05 se confirma la hipótesis alterna, existe una diferencia significativa entre la media de los ingresos de los hombres y las mujeres.    
+
+<h3>Prueba de medianas de los ingresos laborales de los hombres y las mujeres</h3>
+Para comprobar si la medianas de los ingresos de los hombres son iguales a las medianas de ingresos de las mujeres contra la hipótesis alterna: existe diferencia entre las medianas de los ingresos de los hombres y las mujeres se procede a realizar una prueba no paramétrica, en este caso el test de Mann-Witney:
+```{r medianas_ingresos_sexo, echo=FALSE, message=FALSE, warning=FALSE}
+# Covierte en vectores 
+ingresos_hombres <- unlist(ingresos_hombres)
+ingresos_mujeres <- unlist(ingresos_mujeres)
+
+# Realizar la prueba de Mann-Whitney-Wilcoxon
+resultado_mann_whitney <- wilcox.test(ingresos_hombres, ingresos_mujeres, alternative = "two.sided")
+
+# Mostrar resultados
+# Crear una tabla con los resultados clave de resultado_t
+tabla_resultado_mann <- data.frame(
+  Estadístico = c("Método", "Datos", "W", "p-value","Hipótesis alternativa"),
+  Valor = c(
+    resultado_mann_whitney$method,
+    resultado_mann_whitney$data.name,
+    resultado_mann_whitney$statistic,
+    resultado_mann_whitney$p.value,
+    resultado_mann_whitney$alternative
+  )
+)
+
+# Exportar como tabla HTML
+kable(tabla_resultado_mann, format = "html", col.names = c("Estadístico wilcox", "Valor")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+
+```
+Se observa que el p-valor es menor que 0.05, lo que permite suponer que las medianas de los ingresos de los hombres y las mujeres es significativamente diferente.
+<hr style="border: 6px solid  #ff6d1f;"/>
+<h2>Escolaridad de las jefas y jefes del hogar</h2>
+Con fin de conocer las trayectorias escolares de la muestra se procede a revisar los años de escolaridad y los niveles alcanzados para identificar si existe una relación entre la escolaridad y el ingreso laboral.
+<lu>
+  <li>Se observa que a medida que se incrementa el número de años de escolaridad los ingresos aumentan.<br>
+  <li>Tambien se observar que los ingresos mejoran si se tiene el nivel escolar concluido.<br>
+  <li>A medida que se incrementa el nivel escolar los ingresos aumentan.
+  <li>Gráficamente con el nivel de postgrado no se observa una mejoría significativa.
+</lu>
+Recordemos que estamos trabajando con población en condición de pobreza y autoincluida que solicitó se levantara un custionario.
+```{r ingresos_educ, echo=FALSE, message=FALSE, warning=FALSE}
+# la integración de ingresps y educación se realizó en Conexion_ingresos_jefes.R
+
+datos_educ<- read.csv("jefes_ingresos_educ.csv")
+
+#=========
+
+# Crear la gráfica con puntos
+
+ggplot(data = datos_educ) + geom_point(aes(x=ingresos_mensuales, y=noasiste_nivelinst))+
+theme_minimal() +
+  labs(title = "Personas con Ingresos propios y último nivel reportado",
+       x = "Ingresos mensuales",
+       y = "Último nivel reportado",
+       fill = "Densidad")
+
+
+
+
+```
+<h3> Ingresos por años de escolaridad</h3>
+Cuando revisamos la relación entre los años de escolaridad y el monto de los ingresos laborales es más significativo observar como los ingresos mejoran cuando el número de años coincide con la conclusión del nivel escolar a diferencia de quienes reportan el nivel trunco inconcluso en función del número de años, ya que los ingresos en esos casos no parecen mostrar cambios significativos.<br>
+Los casos que se ubican en el cero en la línea horinzontal representan a aquellas personas que no resportaron el dato de escolaridad; los años de escolaridad se consideraron a partir del primer año de primaria, de manera que, quienes reportaron haber concluido los seis años de escolaridad representan a aquellos que concluyeron en nivel de primaria y así sucesivamente.
+```{r ingresos_anioseduc, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = datos_educ) + geom_point(aes(x=anios_estudio, y=ingresos_mensuales))+
+  theme_minimal() +
+  labs(title = "Personas en CHECS con Ingresos propios y años de escolaridad",
+       x = "Años de Estudio",
+       y = "Ingresos Mensuales",
+       fill = "Densidad")
+```
+
+<hr style="border: 6px solid  #ff6d1f;"/>
+<h3>Ingresos por tipo de empleo u ocupación</h3>
+Se observa que los ingresos de algunos empleos relacionados con la presencia de mayor capital intelectual tienen un ingreso ligeramente superior al resto, en este caso: FUNCIONARIO, DIRECTOR Y JEFES; PROFESIONISTAS Y TÉCNICOS y TRABAJADORES AUXILIARES EN ACTVIDADES ADMINISTRATIVAS. En el caso particular corresponde a quines reportan el empleo de AYUDANTE DE UN RANCHO O NEGOCIO FAMILIAR SIN RETRIBUCIÓN presenta mayores ingresos ya que el trabajo agrícola presenta ingresos por levantamiento de cosecha o venta de ganado por ejemplo.  
+
+```{r ingresos_empleo, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+# ggplot(data = datos_educ) + geom_boxplot(aes(x=datos_educ$p56_nombreocupacion, 
+# y=ingresos_mensuales))+
+ # theme(axis.text.x = element_text(angle = 45,hjust = 1)) 
+
+###
+# Crear el gráfico de caja con plotly
+#  original: c("#FEFF9F", "#D3EE98") 
+fig_2 <- plot_ly(datos_educ, x = ~p56_nombreocupacion, y = ~ingresos_mensuales, type = "box") %>%
+  layout(
+    title = "Ingresos por Tipo de Empleo",
+    xaxis = list(
+      title = "Ocupación",
+      tickangle = -20,
+      tickfont = list(size = 8) # Ajusta el tamaño aquí
+    ),
+    yaxis = list(title = "Ingresos"),
+    boxmode = "group" ,
+    width = 1000 # Ajusta el valor para hacer más ancha la gráfica
+  )
+# Mostrar el gráfico
+fig_2
+```
+<hr style="border: 6px solid  #ff6d1f;"/>
+
+<h2>Análisis inferencial </h2>
+<h3>El efecto de los años de escolaridad en los ingresos personales</h3></br>
+Para este propósito utilizamos la Ecuación de Mincer, esta se basa en un modelo semilogarítmico que se utiliza para estimar el retorno de la educación función de los ingresos laborales.<br>
+El cálculo se realiza considerando el logaritmo de los ingresos como variable dependiente y los años de educación, la experiencia laboral y la experiencia laboral al cuadrado para capturar los efectos de no lineales como variables independientes.<br>
+Su resultado permite identificar el incremento en los ingresos como resultado de los años de escolaridad.<br><br>
+Considerando que los años de escolaridad y la experiencia no son las únicas variable que inciden en el monto del ingreso personal, para mejorar la predicción del modelo se recomienda integrar variables como: el sexo, la región y la geografía entre otras variables.
+
+```{r mincer, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+datos_educ<- read.csv("jefes_ingresos_educ.csv")
+
+emincer_ingreso_01 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio)
+emincer_ingreso_02 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia,data=datos_educ)
+emincer_ingreso_03 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2,data=datos_educ)
+emincer_ingreso_04 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Mujer,data=datos_educ)
+emincer_ingreso_05 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre,data=datos_educ)
+emincer_ingreso_06 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+municipio,data=datos_educ)
+emincer_ingreso_07 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+region,data=datos_educ)
+emincer_ingreso_08 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+region+np48nombreocupacion,data=datos_educ)
+#emincer_ingreso_09 <- lm(datos_educ$log_im ~  #datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+educ_completo+Hombre+region,dat#a=datos_educ)
+
+# Generar una tabla con stargazer
+library(stargazer)
+stargazer(emincer_ingreso_01,emincer_ingreso_02,emincer_ingreso_03,type = "text",
+          title = "Resultados de los Modelos de la ecuación de Mincer",
+           column.labels = c("Modelo 1", "Modelo 2", "Modelo 3"),
+          digits = 3)
+
+
+```
+<h3>Modelo 1.</h3> Se realiza sólo para evaluar como se comporta el modelo ante la presencia de la variable años de escolaridad. Se observa que la variable es significativa y positiva.<br>
+<h3>Modelo 2.</h3> Se introduce la variable años de experiencia, ésta al igual que los años de escolaridad son sinificativos y positivos; lo anterior se puede interpretar que por cada grado escolar que se avanza el ingreso de las personas se incrementa en un 11.1%; mientras que, cada año de experiencia que se acumula, el ingreso se incrementa en 0.4%<br>
+<h3>Modelo 3.</h3> Al introducir la variable de años de experiencia al cuadrado, se observa que esta tiene signo negativo lo que se puede interpretar de la siguiente manera: a medida que avanza la edad de las personas el ingreso se va reduciendo en 0.01%, lo que confirma el hallazgo que se observó en la gráfica en la que se presentó el ingreso personal respecto de la edad.
+<hr style="border: 6px solid  #ff6d1f;"/>
+```{r mincer_2, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+
+
+emincer_ingreso_04 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Mujer,data=datos_educ)
+emincer_ingreso_05 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre,data=datos_educ)
+emincer_ingreso_06 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+municipio,data=datos_educ)
+
+
+# Generar una tabla con stargazer
+library(stargazer)
+stargazer(emincer_ingreso_04,emincer_ingreso_05,emincer_ingreso_06,type = "text",
+          title = "Resultados de los Modelos de la ecuación de Mincer",
+           column.labels = c("Modelo 4", "Modelo 5", "Modelo 6"),
+          digits = 3)
+
+
+```
+<h3>Modelos 4 y 5.</h3> Aquí se incorpora la variable sexo, el resultado es significativo para las variables Mujer y Hombre; se observa que, mientras que en el caso de la variable Mujer el ingreso es negativo lo significaría que ser Mujer reduce el ingreso laboral en 14.1%; mientras que en el caso de la variable Hombre el ingreso se incrementa en 14.1%, situación que da idea de la diferencia de los ingresos laborales a partir de considerar el sexo de las personas.<br>
+<h3>Modelo 6.</h3> Se introduce la variable geográfica de municipio (donde habita la persona), que es significativa y positiva en 0.4% incrementa el ingreso de acuerdo con el muncipio en que habita la persona.<br>
+
+
+<hr style="border: 6px solid  #ff6d1f;"/>
+```{r mincer_3, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+emincer_ingreso_07 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+region,data=datos_educ)
+emincer_ingreso_08 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+Hombre+region+np48nombreocupacion,data=datos_educ)
+emincer_ingreso_09 <- lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+educ_completo+Hombre+region,data=datos_educ)
+# Generar una tabla con stargazer
+library(stargazer)
+stargazer(emincer_ingreso_07,emincer_ingreso_08,emincer_ingreso_09,type = "text",
+          title = "Resultados de los Modelos de la ecuación de Mincer",
+           column.labels = c("Modelo 7", "Modelo 8", "Modelo 9"),
+          digits = 3)
+
+
+```
+<h3>Modelo 7.</h3> Aquí se incorpora la variable Región para evaluar si esta afecta el ingreso laboral, se observa que habitar en la región Metropolitana o Norte ambas afectan de manera significativa y positiva en, 15.6% y 32.9% los ingresos laborales de las personas respectivamente; mientras que, vivir en la región Periférica no presenta un impacto significativo. En el caso de las personas que viven en la Región Sur, esta afecta negativamente al ingreso laboral de las personas en un 31.4%<br>
+<h3>Modelo 8.</h3> Aquí además de las variables de Región, se añadío la variable Tipo de Ocupación o Empleo, éste afecta de manera negativa el ingreso laboral.<br>
+<h3>Modelo 9.</h3> Aquí en lugar del Tipo de Ocupación o Empleo se introdujeron las casos en los que se reportó haber concluido el nivel escolar (de acuerdo con el número de años cursados para el nivel). Observandose qué tener el nivel escolar concluido: Preparatoria, Licenciatura o Posgragrado son significativos y positivos en todos los casos: Preparatoria 62%; Licenciatura 75.1% y Postgrado 100.2% <br>
+
+<h3>Observaciones a los modelos</h3> <br>
+1. la muestra no presenta una distribución normal, se considera que dado que tamaño de la muestra es grande esta se aproxima a una distribución normal por teorema de limite central, lo que permite validar los resultados.<br>
+2. entre años_experiencia y años_experiencia^2 existe colinealidad, el factor de inflación VIF es de 14, lo que es esperado por que años_experiencia^2 se obtienen al elevar al cuadrado años_experiencia.<br>
+3. El R^2 y el R^2ajustado son pequeños lo que significa que aún hay variables fuera del modelo que no están consideradas que afectan el modelo.<br>
+4. Se observa que en todos los modelos el estadístico F presenta valores significativos (***) y grandes lo que permite considerar que las variables incorporadas ayudan a explicar la variabilidad del ingreso.
+<br>
+5. A medida que se incrementan variables el modelo se hace complejo y se reduce el valor de F, sin embargo, en el modelo 9 al introducir el nivel de escolaridad concluido aunque F baja, la R^2ajustada es mejor que en el resto de los modelos.
+
+<h3> Algunas conclusiones derivadas de las observaciones analizadas</h3>
+<ul>
+<li> A. Al identificarse una brecha a favor del ingreso de los hombres, se justifica promover el acceso a apoyos monetarios adicionales, el desarrollo de acciones de capacitación para incentivar el autoempleo y el emprendurismo, así como el acceso a creditos financieros para las mujeres con el fin de mejorar sus ingresos personales.<br><br>
+<li> B. En general los ingresos laborales de esta población debe mejorar ya que en promedio están por debajo del salario mínimo diario, cuando se trata de jefes de familia como único sustento del hogar éste es insuficiente para satisfacer sus necesidades básicas lo que los ubica por debajo de la línea de pobreza.<br><br>
+<li> C. Avanzar los grados de escolaridad es bueno, pero en terminos de ingresos laborales resulta óptimo concluir los niveles escolares ya que esto afecta significativamente los ingresos laborales de las personas. Se deben promover acciones encaminadas a lograr que la población concluya los niveles escolares truncos.<br><br>
+<li> D. A medida que aumenta la edad de las personas, sobre todo después de los 60 años, los ingresos laborales disminuyen, por lo que implementar acciones que aumenten sus ingresos o reduzcan sus gastos (acceso a servicios de salud, medicamentos, aparatos de movilidad, etc.), mejoran su calidad de vida.<br><br>
+</ul>
+<br>
+<hr style="border: 6px solid  #ff6d1f;"/>
+```{r validez_interna, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+library(lmtest)
+
+# lm(datos_educ$log_im ~  datos_educ$anios_estudio+anios_experiencia+anios_experiencia_2+educ_completo+Hombre+region,data=datos_educ)
+# anios_estudio+anios_experiencia+anios_experiencia_2+educ_completo+Hombre+region
+modelo <- lm(log_im ~ anios_estudio + anios_experiencia + +anios_experiencia_2+educ_completo+Hombre+region, data = datos_educ)
+# Realizar el test de Ramsey RESET
+reset <- resettest(modelo, power = 2:3) # Puedes probar diferentes potencias
+
+# Imprimir los resultados
+print(reset)
+
+#library(lmtest)
+t_heteroc <- bptest(modelo)
+print(t_heteroc)
+
+library(sandwich)
+print(coeftest(modelo, vcov = vcovHC(modelo, type = "HC1")))
+```
+
+<hr style="border: 6px solid  #ff6d1f;"/>
+```{r  hetero_aplica_pesos, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+sapply(datos_educ, function(x) any(is.na(x) | x == "Inf"))
+any(is.na(datos_educ$pesos) | datos_educ$pesos == "Inf")
+datos_educ <- datos_educ[!is.na(datos_educ$pesos) & datos_educ$pesos != "Inf", ]
+print(nrow(datos_educ))
+
+datos_educ <- datos_educ[complete.cases(datos_educ), ]
+datos_educ <- datos_educ[!is.na(datos_educ$pesos) & datos_educ$pesos != "Inf", ]
+ylim <- range(datos_educ$pesos, na.rm = TRUE)
+ylim <- c(min(datos_educ$pesos, na.rm = TRUE), max(datos_educ$pesos, na.rm = TRUE))
+plot(x = datos_educ$anios_estudio, 
+     y = datos_educ$pesos, 
+     ylim = range(datos_educ$pesos, na.rm = TRUE), 
+     xlab = "Años de Estudio", 
+     ylab = "Pesos")
+
+
+boxplot(datos_educ$pesos)
+modelo_ponderado <- lm(log_im ~ anios_estudio + anios_experiencia + anios_experiencia_2 + educ_completo + Hombre + region, 
+                       data = datos_educ, 
+                       weights = datos_educ$pesos)
+summary(modelo_ponderado)
+
+
+
+
+```
+<hr style="border: 6px solid  #ff6d1f;"/>
+```{r ejemplo, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+
+# 1. Usar los coeficientes de tu regresión
+# Tus coeficientes estimados son:
+
+#𝛽0  (Intercepto): 6.7718
+
+#𝛽1 (anios_estudio): 0.044454
+
+#𝛽2 (anios_experiencia): 0.017074
+
+#𝛽3  (anios_experiencia^2): -0.00025889
+
+#La ecuación del ingreso (logarítmico) sería:
+
+# log(ingreso) = 𝛽0 + 𝛽1⋅anos de estudio+𝛽2an˜os de experiencia+ 𝛽3⋅(an˜os de experiencia)2
+
+# Crear el rango de edades (de 18 a 80 años)
+edad <- seq(18, 80, by = 1)
+
+# Calcular años de experiencia como edad - 18
+anios_experiencia <- edad - 18
+
+# Usar los coeficientes estimados para calcular el ingreso logarítmico
+log_ingreso <- 6.7718 + 0.017074 * anios_experiencia + (-0.00025889) * (anios_experiencia^2)
+
+# Convertir log(ingreso) a ingreso real
+ingreso <- exp(log_ingreso)
+
+# Graficar la relación
+plot(edad, ingreso, type = "l", col = "blue", lwd = 2, xlab = "Edad", ylab = "Ingreso mensual bruto", 
+     main = "Relación entre edad e ingreso laboral")
+
+# Marcar el punto de inflexión
+punto_inflexion <- 33 # Ya calculado antes
+abline(v = punto_inflexion, col = "red", lty = 2)
+text(punto_inflexion, max(ingreso), labels = paste("Punto máximo: ", punto_inflexion, "años"), pos = 4, col = "red")
+
+```
+
+<h2> <a href="Perfil_s_empleo.html" class="custom-link">Perfil de las jefas y jefes que no están trabajando</a></h2>
+<h2> <a href="index.html" class="custom-link">Volver a la página principal</a></h2>
+</body>
+</html>
